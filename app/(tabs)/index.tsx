@@ -1,39 +1,48 @@
 import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Button, StyleSheet, Text } from 'react-native';
 
 import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { WEATHER_TYPES } from '@/constants/weather-types';
 import { Link } from 'expo-router';
+import { useState } from 'react';
+
+const headerImageSource = require('@/assets/images/seoul_night.png')
 
 export default function HomeScreen() {
+  const [particlesCnt] = useState(800)
+  const [weatherType, setWeatherType] = useState<typeof WEATHER_TYPES[keyof typeof WEATHER_TYPES]>(WEATHER_TYPES.CLOUDY);
+
   return (
     <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
+      headerBackgroundColor={{ light: '#768BD0', dark: '#1D3D47' }}
       headerImage={
         <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
+          source={headerImageSource}
+          contentFit="cover"
+          contentPosition="top center"
+          style={styles.headerImage}
         />
-      }>
+      }
+      rainBackgroundSource={headerImageSource}
+      snowCount={particlesCnt}
+      weatherType={weatherType}
+    >
       <ThemedView style={styles.titleContainer}>
         <ThemedText type="title">Welcome!</ThemedText>
         <HelloWave />
       </ThemedView>
       <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
+        <ThemedText type="subtitle">
+          <Text className="text-red-500">Step</Text>
+          1: Try out it
+        </ThemedText>
         <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
+          <Button title="Cloudy" onPress={() => setWeatherType(WEATHER_TYPES.CLOUDY)} />
+          <Button title="Rainy" onPress={() => setWeatherType(WEATHER_TYPES.RAINY)} />
+          <Button title="Snowy" onPress={() => setWeatherType(WEATHER_TYPES.SNOWY)} />
         </ThemedText>
       </ThemedView>
       <ThemedView style={styles.stepContainer}>
@@ -86,13 +95,11 @@ const styles = StyleSheet.create({
   },
   stepContainer: {
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 80,
+    marginTop: 80,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  headerImage: {
+    height: '100%',
+    width: '100%',
   },
 });
