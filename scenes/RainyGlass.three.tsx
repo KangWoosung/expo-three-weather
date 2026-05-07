@@ -264,10 +264,9 @@ const DROP_VERT = /* glsl */`
 // Uses the same coverUV() as BG_FRAG (identical uBgScale / uBgOffset uniforms)
 // so every refracted background sample is guaranteed to be the correct texel.
 //
-// Lighting faithful to rainyday.js:
-//   glo        — radial falloff from light; far → transparent, near → 99 % lit
-//   spec/spe2  — Blinn-Phong + mirror highlights
-//   shadowBand — dark crescent on the hemisphere side away from the light
+// Lighting: rainyday-ish base +
+//   contactShadow — bottom rim + opposite-light emphasis (glass contact)
+//   innerRimDark  — thin dark outline, boosted next to specular on the silhouette
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DROP_FRAG = /* glsl */`
@@ -332,10 +331,30 @@ const DROP_FRAG = /* glsl */`
     float spec = pow(max(dot(N,  H), 0.0), 96.0);
     float spe2 = pow(max(dot(reflect(-L, N), V), 0.0), 44.0);
 
-    // ── Diffuse + shadow crescent  ─────────────────────────────────────────
+    // ── Diffuse + hemispherical crescent away from light  ──────────────────
     float NdotL      = max(dot(N, L), 0.0);
-    float diffLift   = mix(0.28, 1.0, NdotL);
-    float shadowBand = pow(1.0 - NdotL, 1.75) * 0.4;
+    float diffLift   = mix(0.26, 1.0, NdotL);
+    float shadowBand = pow(1.0 - NdotL, 1.85) * 0.46;
+
+    // ── Contact / volume shadow: bottom of silhouette + opposing light ───────
+    // Plane UV: sq.y negative → fragment toward screen bottom → glass contact band.
+    float nearSil    = smoothstep(0.58, 0.994, qr);
+    float bottomCres = clamp((-sq.y - 0.06) / 0.72, 0.0, 1.0);
+    float opposeLight = pow(1.0 - NdotL, 1.35);
+    float contactShadow =
+      nearSil * clamp(0.55 * bottomCres + 0.42 * opposeLight, 0.0, 1.0);
+    contactShadow = min(contactShadow * 1.06, 0.78);
+
+    // ── Inner rim: perimeter darkening, extra band beside specular lobe ────
+    float rimBand    = smoothstep(0.78, 0.992, qr);
+    float specNear   = pow(max(dot(N, H), 0.0), 4.5);
+    float litFacing  = smoothstep(0.28, 0.9, NdotL);
+    // Sharp dark line hugging outline where highlight hits the edge
+    float rimBySpec =
+      rimBand * litFacing * clamp(specNear * 4.8 + spe2 * 2.8, 0.0, 1.0);
+    float perimeterRim =
+      rimBand * smoothstep(0.93, 0.997, qr) * (0.34 + 0.28 * litFacing);
+    float innerRimDark = clamp(0.62 * rimBySpec + perimeterRim * 0.85, 0.0, 0.72);
 
     // ── Global light glow (far → transparent, near → 99 % lit)  ───────────
     float glo = pow(1.0 - clamp(length(vDropUV - uLightPos) / 0.88, 0.0, 1.0), 1.15);
@@ -343,9 +362,10 @@ const DROP_FRAG = /* glsl */`
     // ── Composite  ─────────────────────────────────────────────────────────
     vec3 col = base * diffLift;
     col = mix(col, refl, fresnel * 0.28);
+    float shadeAmt = clamp(shadowBand + contactShadow * 0.92 + innerRimDark * 0.88, 0.0, 0.92);
+    col *= (1.0 - shadeAmt);
     col += uLightColor * (spec * 0.7 + spe2 * 0.42) * glo;
     col += uLightColor * fresnel * 0.1;
-    col *= (1.0 - shadowBand);
     col  = clamp(col, 0.0, 1.0);
 
     float alpha = mask * mix(0.09, 0.62, NdotV)

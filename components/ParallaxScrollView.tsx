@@ -20,7 +20,7 @@
 import { ThemedView } from '@/components/themed-view';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import React, { PropsWithChildren, ReactElement, useRef, useState } from 'react';
+import React, { PropsWithChildren, ReactElement, useEffect, useRef, useState } from 'react';
 import { Button, ImageSourcePropType, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   interpolate,
@@ -35,10 +35,15 @@ import Animated, {
 // import CloudsScene from '@/scenes/Clouds.three';
 import { WEATHER_TYPES } from '@/constants/weather-types';
 import CloudsScene from '@/scenes/Clouds.three';
-import RainyGlass, { RainyGlassRef } from '@/scenes/RainyGlass.three';
+import RainDropFX from '@/scenes/RainDropFX.three';
+import RainyDayWebView from '@/scenes/RainyDayWebView';
+import { RainyGlassRef } from '@/scenes/RainyGlass.three';
 import SnowParticles from '@/scenes/SnowParticles.three';
+import useWeatherStore from '@/zustand/useWeatherStore';
+import Ionicons from '@expo/vector-icons/build/Ionicons';
+import WeatherForecastContainer from './WeatherForecastContainer';
 
-const HEADER_HEIGHT = 450
+export const HEADER_HEIGHT = 450
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 type Props = PropsWithChildren<{
@@ -51,7 +56,7 @@ type Props = PropsWithChildren<{
   /** Hue 변동 (기본 true) */
   snowHueVariation?: boolean
   /** Rainy glass droplets sample this image for reflection color. */
-  rainBackgroundSource?: number
+  backgroundSource?: ImageSourcePropType
   weatherType: typeof WEATHER_TYPES[keyof typeof WEATHER_TYPES]
 }>
 
@@ -63,18 +68,46 @@ export default function ParallaxScrollView({
   letItSnow = true,
   snowCount = 1000,
   snowHueVariation = true,
-  rainBackgroundSource,
-  weatherType,
+  backgroundSource,
 }: Props) {
+  const { weather: weatherType } = useWeatherStore()
   const backgroundColor = useThemeColor({}, 'background')
   const colorScheme = useColorScheme() ?? 'light'
   const scrollRef = useAnimatedRef<Animated.ScrollView>()
   const scrollOffset = useScrollViewOffset(scrollRef)
   const [rainEnabled, setRainEnabled] = useState(true)
   const rainyRef = useRef<RainyGlassRef>(null)
-  const cloudSpeed = 0.12
-  const cloudCover = 0.2
-  const cloudDensity = 0.42
+  const { weatherTime } = useWeatherStore()
+  const [weatherTimeShortFormat, setWeatherTimeShortFormat] = useState('')
+  const [weatherIcon, setWeatherIcon] = useState<string>('sunny-outline')
+
+  useEffect(() => {
+    const newWeatherTimeShortFormat = weatherTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    setWeatherTimeShortFormat(newWeatherTimeShortFormat)
+  }, [weatherTime.getHours(), weatherTime.getMinutes()])
+
+  useEffect(() => {
+    switch (weatherType) {
+      case WEATHER_TYPES.SUNNY:
+        setWeatherIcon('sunny-outline')
+        break
+      case WEATHER_TYPES.CLOUDY:
+        setWeatherIcon('cloudy-outline')
+        break
+      case WEATHER_TYPES.SNOWY:
+        setWeatherIcon('snow-outline')
+        break
+      case WEATHER_TYPES.RAINY:
+        setWeatherIcon('rainy-outline')
+        break
+      case WEATHER_TYPES.EXTREME_RAINY:
+        setWeatherIcon('extreme-rainy-outline')
+        break
+      default:
+        setWeatherIcon('sunny-outline')
+        break
+    }
+  }, [weatherType])
 
   const headerAnimatedStyle = useAnimatedStyle(() => ({
     transform: [
@@ -116,8 +149,13 @@ export default function ParallaxScrollView({
         >
           {headerImage}
           <View style={styles.headerForeground} pointerEvents="none">
+            <Text style={styles.headerTime}>{weatherTimeShortFormat}</Text>
             <Text style={styles.headerTitle}>서울</Text>
+            <Ionicons name={weatherIcon as any} size={40} color="white" />
           </View>
+
+          {/* Weather ForeCast */}
+          <WeatherForecastContainer />
 
           {weatherType === WEATHER_TYPES.CLOUDY && (
             <CloudsScene
@@ -147,18 +185,8 @@ export default function ParallaxScrollView({
             brightness={1}
             reflectionStrength={0.78}
             flowDirection={[0.08, 1]}
-            backgroundSource={rainBackgroundSource}
+            backgroundSource={backgroundSource}
           /> */}
-
-          {weatherType === WEATHER_TYPES.RAINY && (
-            <RainyGlass
-              enabled={rainEnabled}
-              source={rainBackgroundSource as ImageSourcePropType}
-              ref={rainyRef}
-              maxDrops={100}
-              dropScale={1.2}
-              backgroundContentPosition="top"
-            />)}
 
           {weatherType === WEATHER_TYPES.SNOWY && (
             <SnowParticles
@@ -166,6 +194,27 @@ export default function ParallaxScrollView({
               maxCount={400}
               hueVariation={snowHueVariation}
             />)}
+
+          {/* {weatherType === WEATHER_TYPES.RAINY && (
+            <RainyGlass
+              enabled={rainEnabled}
+              source={backgroundSource as ImageSourcePropType}
+              ref={rainyRef}
+              maxDrops={100}
+              dropScale={1.2}
+              backgroundContentPosition="top"
+            />)} */}
+
+          {weatherType === WEATHER_TYPES.RAINY && (
+            <RainyDayWebView backgroundImage={backgroundSource as ImageSourcePropType} />
+          )}
+
+          {weatherType === WEATHER_TYPES.EXTREME_RAINY && (
+            <RainDropFX
+              enabled={rainEnabled}
+              source={backgroundSource as ImageSourcePropType}
+            />
+          )}
 
         </Animated.View>
 
@@ -208,6 +257,10 @@ const styles = StyleSheet.create({
   },
   headerForeground: {
     position: 'absolute',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 0,
     top: 60,
     right: 48,
     zIndex: 20,
@@ -216,9 +269,17 @@ const styles = StyleSheet.create({
     color: 'floralwhite',
     fontSize: 40,
     fontWeight: 'bold',
-    textShadowColor: 'rgba(60, 60, 60, 0.75)',
+    textShadowColor: 'rgb(29 29 29)',
     textShadowOffset: { width: 0, height: 4 },
     textShadowRadius: 24,
+  },
+  headerTime: {
+    color: 'floralwhite',
+    fontSize: 14,
+    fontWeight: 'normal',
+    textShadowColor: 'rgb(30 30 30)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 12,
   },
   content: {
     flex: 1,

@@ -1,9 +1,11 @@
 /** Shared by screens and layout components — avoids circular imports via `@/app/(tabs)`. */
 
 export const WEATHER_TYPES = {
+  SUNNY: 'sunny',
   CLOUDY: 'cloudy',
-  RAINY: 'rainy',
   SNOWY: 'snowy',
+  RAINY: 'rainy',
+  EXTREME_RAINY: 'extreme_rainy',
 } as const;
 
 export type WeatherType =

@@ -27,3 +27,6 @@ npx expo install expo-gl expo-three three @react-three/fiber
 
 # drei RN 지원 버전
 npm install @react-three/drei
+
+## WebView
+npx expo install react-native-webview expo-asset expo-file-system
